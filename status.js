@@ -189,8 +189,106 @@ function renderStatusPage(serverState = {}) {
       margin-top: 20px;
       font-size: 0.9em;
     }
+    .control-panel {
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      text-align: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .control-panel h3 {
+      margin-top: 0;
+      color: #4caf50;
+      font-size: 1.2em;
+      border-bottom: 2px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+    .btn-group {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 12px 30px;
+      font-size: 1em;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      min-width: 150px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .btn-restart {
+      background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+      color: white;
+    }
+    .btn-restart:hover {
+      background: linear-gradient(135deg, #ffa726 0%, #fb8c00 100%);
+    }
+    .btn-stop {
+      background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+      color: white;
+    }
+    .btn-stop:hover {
+      background: linear-gradient(135deg, #e57373 0%, #f44336 100%);
+    }
+    .btn-start {
+      background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+      color: white;
+    }
+    .btn-start:hover {
+      background: linear-gradient(135deg, #66bb6a 0%, #4caf50 100%);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #2a2a2a;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      display: none;
+      z-index: 1000;
+      border-left: 4px solid #4caf50;
+    }
+    .notification.show {
+      display: block;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
     @media (max-width: 768px) {
       .grid { grid-template-columns: 1fr; }
+      .btn-group { flex-direction: column; }
+      .btn { width: 100%; }
     }
   </style>
 </head>
@@ -209,6 +307,18 @@ function renderStatusPage(serverState = {}) {
         <div class="last-event-time">${lastEventTime}</div>
       </div>
       ` : ''}
+    </div>
+
+    <div class="control-panel">
+      <h3>🎮 Control del Servidor</h3>
+      <div class="btn-group">
+        <button class="btn btn-restart" onclick="controlServer('restart')">
+          🔄 Reiniciar Servidor
+        </button>
+        <button class="btn btn-stop" onclick="controlServer('stop')">
+          ⏹️ Detener Servidor
+        </button>
+      </div>
     </div>
 
     <div class="grid">
@@ -264,6 +374,8 @@ function renderStatusPage(serverState = {}) {
     </div>
   </div>
 
+  <div id="notification" class="notification"></div>
+
   <script>
     // Scroll automático al final de los logs cuando carga la página
     window.addEventListener('load', function() {
@@ -272,6 +384,56 @@ function renderStatusPage(serverState = {}) {
         logsElement.scrollTop = logsElement.scrollHeight;
       }
     });
+
+    // Función para mostrar notificaciones
+    function showNotification(message, duration = 3000) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.classList.add('show');
+      setTimeout(() => {
+        notification.classList.remove('show');
+      }, duration);
+    }
+
+    // Función para controlar el servidor
+    async function controlServer(action) {
+      const buttons = document.querySelectorAll('.btn');
+      buttons.forEach(btn => btn.disabled = true);
+
+      const messages = {
+        restart: 'Reiniciando servidor...',
+        stop: 'Deteniendo servidor...',
+        start: 'Iniciando servidor...'
+      };
+
+      showNotification(messages[action]);
+
+      try {
+        const response = await fetch('/api/' + action, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+          showNotification('✅ ' + result.message);
+          if (action !== 'stop') {
+            setTimeout(function() { location.reload(); }, 2000);
+          }
+        } else {
+          showNotification('❌ Error: ' + result.message, 5000);
+        }
+      } catch (error) {
+        showNotification('❌ Error de conexión: ' + error.message, 5000);
+      } finally {
+        setTimeout(() => {
+          buttons.forEach(btn => btn.disabled = false);
+        }, 2000);
+      }
+    }
   </script>
 </body>
 </html>
