@@ -1,0 +1,32 @@
+{
+  "name": "rtmp-server-dashboard",
+  "type": "module",
+  "version": "2.0.0",
+  "description": "Sistema de streaming RTMP profesional con dashboard web independiente, métricas en tiempo real y gestión de servicios Windows",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dashboard": "node dashboard-server.js",
+    "rtmp": "node server.js",
+    "test": "node test-dashboard.js"
+  },
+  "keywords": [
+    "rtmp",
+    "streaming",
+    "dashboard",
+    "websocket",
+    "real-time",
+    "windows-service"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "node-media-server": "^4.2.4",
+    "ws": "^8.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Juanes7222/RTMP-Server"
+  }
+}

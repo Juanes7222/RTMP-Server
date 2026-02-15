@@ -1,0 +1,16 @@
+<service>
+  <id>RTMP-Dashboard</id>
+  <name>RTMP Dashboard Server</name>
+  <description>Dashboard web para monitoreo del servidor RTMP - Funciona independientemente del servidor RTMP</description>
+  <executable>node</executable>
+  <arguments>dashboard-server.js</arguments>
+  <workingdirectory>C:\RTMP</workingdirectory>
+  <logpath>C:\RTMP\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <onfailure action="restart" delay="10 sec"/>
+  <onfailure action="restart" delay="20 sec"/>
+  <resetfailure>1 hour</resetfailure>
+</service>
