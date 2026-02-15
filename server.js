@@ -17,10 +17,12 @@ const __dirname = dirname(__filename);
 
 const LOG_FILE = path.join(__dirname, 'logs', 'app.log');
 
+// Asegurar que existe el directorio de logs
 if (!fs.existsSync(path.join(__dirname, 'logs'))) {
   fs.mkdirSync(path.join(__dirname, 'logs'));
 }
 
+// Estado en tiempo real del servidor
 const serverState = {
   status: 'starting',
   lastEvent: 'Iniciando servidor...',
@@ -43,7 +45,7 @@ const serverState = {
 
 // Inicializar WebSocket Server
 const wsServer = initWebSocketServer(8002);
-info('WebSocket Server iniciado en puerto 8002');
+info(' WebSocket Server iniciado en puerto 8002');
 
 // Sistema de logging mejorado
 function writeLog(level, message) {
@@ -94,7 +96,7 @@ function success(msg) {
 }
 
 const ip = getLocalIP();
-info(`Local IP: ${ip}`);
+info(` Local IP: ${ip}`);
 
 // Configuración del servidor RTMP
 const rtmpConfig = {
@@ -113,79 +115,12 @@ const config = {
   logType: 3, // 0: debug, 1: error, 2: fatal, 3: none
 };
 
-let nms = null;
+// Inicializar NodeMediaServer
+const nms = new NodeMediaServer(config);
 
-// Función para iniciar el servidor RTMP
-function startRTMPServer() {
-  if (nms) {
-    warn('El servidor RTMP ya está corriendo');
-    return false;
-  }
-  
-  try {
-    nms = new NodeMediaServer(config);
-    setupNodeMediaEvents();
-    nms.run();
-    
-    serverState.status = 'waiting_camera';
-    serverState.lastEvent = 'Servidor RTMP iniciado';
-    serverState.lastEventTime = new Date();
-    serverState.startTime = new Date();
-    
-    success('Servidor RTMP iniciado correctamente');
-    updateServerState(serverState);
-    
-    addActivity({
-      type: 'success',
-      icon: 'check-circle',
-      message: 'Servidor RTMP iniciado correctamente'
-    });
-    
-    return true;
-  } catch (err) {
-    error(`Error al iniciar servidor RTMP: ${err.message}`);
-    serverState.status = 'error';
-    updateServerState(serverState);
-    return false;
-  }
-}
-
-// Función para detener el servidor RTMP
-function stopRTMPServer() {
-  if (!nms) {
-    warn('El servidor RTMP no está corriendo');
-    return false;
-  }
-  
-  try {
-    nms = null;
-    
-    serverState.status = 'starting';
-    serverState.lastEvent = 'Servidor RTMP detenido';
-    serverState.lastEventTime = new Date();
-    serverState.cameraConnected = false;
-    serverState.cameraIP = null;
-    serverState.obsConnected = false;
-    serverState.obsIP = null;
-    
-    success('Servidor RTMP detenido');
-    updateServerState(serverState);
-    
-    addActivity({
-      type: 'error',
-      icon: 'square',
-      message: 'Servidor RTMP detenido'
-    });
-    
-    return true;
-  } catch (err) {
-    error(`Error al detener servidor RTMP: ${err.message}`);
-    return false;
-  }
-}
-
+// Función para ejecutar comandos del servicio de Windows (si aplica)
 async function executeServiceCommand(action) {
-  const serviceName = 'RTMP-Server'; 
+  const serviceName = 'RTMP-Server'; // Ajusta el nombre del servicio si es diferente
   let command = '';
   
   switch(action) {
@@ -241,7 +176,7 @@ function setupNodeMediaEvents() {
 
   nms.on("postPublish", (session) => {
     info(`[postPublish] id=${session.id} StreamPath=${session.streamPath} ip=${session.ip}`);
-    success(`Cámara conectada y transmitiendo desde ${session.ip}`);
+    success(` Cámara conectada y transmitiendo desde ${session.ip}`);
     
     serverState.cameraConnected = true;
     serverState.cameraIP = session.ip;
@@ -262,7 +197,7 @@ function setupNodeMediaEvents() {
 
   nms.on("donePublish", (session) => {
     info(`[donePublish] id=${session.id} StreamPath=${session.streamPath} ip=${session.ip}`);
-    warn(`Cámara desconectada (${session.ip})`);
+    warn(` Cámara desconectada (${session.ip})`);
     
     serverState.cameraConnected = false;
     serverState.cameraIP = null;
@@ -287,13 +222,13 @@ function setupNodeMediaEvents() {
     
     // Verificar si hay un publisher activo
     if (!session.broadcast?.publisher) {
-      warn("No hay stream publicado aún, el cliente intentará reconectar");
+      warn(" No hay stream publicado aún, el cliente intentará reconectar");
     }
   });
 
   nms.on("postPlay", (session) => {
     info(`[postPlay] id=${session.id} StreamPath=${session.streamPath} ip=${session.ip}`);
-    success(`OBS conectado desde ${session.ip}`);
+    success(` OBS conectado desde ${session.ip}`);
     
     serverState.obsConnected = true;
     serverState.obsIP = session.ip;
@@ -314,7 +249,7 @@ function setupNodeMediaEvents() {
 
   nms.on("donePlay", (session) => {
     info(`[donePlay] id=${session.id} StreamPath=${session.streamPath} ip=${session.ip}`);
-    warn(`OBS desconectado (${session.ip})`);
+    warn(` OBS desconectado (${session.ip})`);
     
     serverState.obsConnected = false;
     serverState.obsIP = null;
@@ -386,27 +321,27 @@ const httpServer = http.createServer(async (req, res) => {
   
   // API: Iniciar servidor
   else if (req.url === '/api/start' && req.method === 'POST') {
-    info('Solicitud de inicio del servidor recibida');
+    info(' Solicitud de inicio del servidor recibida');
     
     // Si está corriendo como servicio de Windows, usar comando de servicio
-    // De lo contrario, iniciar directamente
     if (process.env.RUNNING_AS_SERVICE === 'true') {
       const result = await executeServiceCommand('start');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(result));
     } else {
-      const started = startRTMPServer();
+      // Si no es servicio, el servidor ya debería estar corriendo
+      // porque node-media-server inicia automáticamente al ejecutar server.js
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
-        success: started, 
-        message: started ? 'Servidor iniciado correctamente' : 'El servidor ya está corriendo o hubo un error'
+        success: true, 
+        message: 'El servidor ya está corriendo (node-media-server no admite start/stop dinámico)'
       }));
     }
   } 
   
   // API: Reiniciar servidor
   else if (req.url === '/api/restart' && req.method === 'POST') {
-    info('Solicitud de reinicio del servidor recibida');
+    info(' Solicitud de reinicio del servidor recibida');
     
     serverState.lastEvent = 'Reiniciando servidor...';
     serverState.lastEventTime = new Date();
@@ -418,24 +353,27 @@ const httpServer = http.createServer(async (req, res) => {
     });
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, message: 'Reiniciando servidor...' }));
     
-    // Reiniciar después de enviar respuesta
-    setTimeout(async () => {
-      if (process.env.RUNNING_AS_SERVICE === 'true') {
+    // Si está corriendo como servicio de Windows, usar comando de servicio
+    if (process.env.RUNNING_AS_SERVICE === 'true') {
+      res.end(JSON.stringify({ success: true, message: 'Reiniciando servicio...' }));
+      
+      setTimeout(async () => {
         await executeServiceCommand('restart');
-      } else {
-        stopRTMPServer();
-        setTimeout(() => {
-          startRTMPServer();
-        }, 1000);
-      }
-    }, 500);
+      }, 500);
+    } else {
+      // Si no es servicio, reiniciar el proceso Node
+      res.end(JSON.stringify({ success: true, message: 'Reiniciando servidor (proceso se cerrará)...' }));
+      
+      setTimeout(() => {
+        process.exit(0); // El servicio se reiniciará automáticamente
+      }, 1000);
+    }
   } 
   
   // API: Detener servidor
   else if (req.url === '/api/stop' && req.method === 'POST') {
-    info('Solicitud de detención del servidor recibida');
+    info(' Solicitud de detención del servidor recibida');
     
     serverState.lastEvent = 'Deteniendo servidor...';
     serverState.lastEventTime = new Date();
@@ -447,16 +385,22 @@ const httpServer = http.createServer(async (req, res) => {
     });
     
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, message: 'Deteniendo servidor...' }));
     
-    // Detener después de enviar respuesta
-    setTimeout(async () => {
-      if (process.env.RUNNING_AS_SERVICE === 'true') {
+    // Si está corriendo como servicio de Windows, usar comando de servicio
+    if (process.env.RUNNING_AS_SERVICE === 'true') {
+      res.end(JSON.stringify({ success: true, message: 'Deteniendo servicio...' }));
+      
+      setTimeout(async () => {
         await executeServiceCommand('stop');
-      } else {
-        stopRTMPServer();
-      }
-    }, 500);
+      }, 500);
+    } else {
+      // Si no es servicio, cerrar el proceso
+      res.end(JSON.stringify({ success: true, message: 'Deteniendo servidor...' }));
+      
+      setTimeout(() => {
+        process.exit(0);
+      }, 1000);
+    }
   } 
   
   // API: Obtener estado actual (para debugging)
@@ -473,13 +417,13 @@ const httpServer = http.createServer(async (req, res) => {
 });
 
 httpServer.listen(8000, () => {
-  success(`Dashboard disponible en http://${ip}:8000`);
-  info(`Panel de control: http://localhost:8000`);
+  success(` Dashboard disponible en http://${ip}:8000`);
+  info(` Panel de control: http://localhost:8000`);
 });
 
 // Manejo de errores global
 process.on('uncaughtException', (err) => {
-  error(`Error no capturado: ${err.message}\n${err.stack}`);
+  error(` Error no capturado: ${err.message}\n${err.stack}`);
   
   addActivity({
     type: 'error',
@@ -491,7 +435,7 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  error(`Promesa rechazada no manejada: ${reason}`);
+  error(` Promesa rechazada no manejada: ${reason}`);
   
   addActivity({
     type: 'error',
@@ -513,26 +457,38 @@ console.log(`
 ╚════════════════════════════════════════════════════════════╝
 `);
 
-info("Iniciando servidor RTMP...");
-info(`URL de streaming: rtmp://${ip}:1935/live/stream`);
-info(`URL HTTP Dashboard: http://${ip}:8000`);
-info(`WebSocket Server: ws://${ip}:8002`);
+info(" Iniciando servidor RTMP...");
+info(` URL de streaming: rtmp://${ip}:1935/live/stream`);
+info(` URL HTTP Dashboard: http://${ip}:8000`);
+info(` WebSocket Server: ws://${ip}:8002`);
 
-// Iniciar el servidor RTMP
-startRTMPServer();
+// Configurar eventos y iniciar el servidor RTMP
+setupNodeMediaEvents();
+nms.run();
 
 // Actualizar estado después de iniciar
 setTimeout(() => {
-  if (nms) {
-    success('Servidor listo, esperando conexiones...');
-    info('Configura tu cámara IP para enviar a: rtmp://' + ip + ':1935/live/stream');
-    info('Configura OBS para recibir desde: rtmp://' + ip + ':1935/live/stream');
-  }
+  serverState.status = 'waiting_camera';
+  serverState.lastEvent = 'Servidor iniciado correctamente';
+  serverState.lastEventTime = new Date();
+  success(' Servidor listo, esperando conexiones...');
+  info(' Configura tu cámara IP para enviar a: rtmp://' + ip + ':1935/live/stream');
+  info(' Configura OBS para recibir desde: rtmp://' + ip + ':1935/live/stream');
+  
+  // Notificar a WebSocket
+  updateServerState(serverState);
+  
+  // Agregar actividad
+  addActivity({
+    type: 'success',
+    icon: 'check-circle',
+    message: 'Servidor RTMP iniciado correctamente'
+  });
 }, 1000);
 
 // Manejo de cierre limpio
 process.on('SIGINT', () => {
-  console.log('\nSeñal de cierre recibida (SIGINT)...');
+  console.log('\n Señal de cierre recibida (SIGINT)...');
   
   addActivity({
     type: 'error',
@@ -541,28 +497,23 @@ process.on('SIGINT', () => {
   });
   
   setTimeout(() => {
-    if (nms) {
-      info('Deteniendo servidor RTMP...');
-      stopRTMPServer();
-    }
-    
     if (wsServer) {
-      info('Cerrando WebSocket server...');
+      info(' Cerrando WebSocket server...');
       wsServer.close();
     }
     
     if (httpServer) {
-      info('Cerrando servidor HTTP...');
+      info(' Cerrando servidor HTTP...');
       httpServer.close();
     }
     
-    success('Servidor cerrado correctamente');
+    success(' Servidor cerrado correctamente');
     process.exit(0);
   }, 500);
 });
 
 process.on('SIGTERM', () => {
-  console.log('\nSeñal de cierre recibida (SIGTERM)...');
+  console.log('\n Señal de cierre recibida (SIGTERM)...');
   
   addActivity({
     type: 'error',
@@ -571,9 +522,6 @@ process.on('SIGTERM', () => {
   });
   
   setTimeout(() => {
-    if (nms) {
-      nms.stop();
-    }
     if (wsServer) {
       wsServer.close();
     }
@@ -585,3 +533,5 @@ process.on('SIGTERM', () => {
   }, 500);
 });
 
+// Exportar para uso programático si es necesario
+export { serverState };
