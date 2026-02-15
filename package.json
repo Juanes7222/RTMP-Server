@@ -12,6 +12,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "node-media-server": "^4.2.4"
+    "express": "^5.2.1",
+    "node-media-server": "^4.2.4",
+    "ws": "^8.19.0"
   }
 }
