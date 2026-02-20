@@ -4,7 +4,38 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { renderStatusPage } from './status.js';
+
+const execPromise = promisify(exec);
+const RTMP_SERVICE_NAME = 'RTMP-Server';
+
+async function executeServiceCommand(action) {
+  const commands = {
+    start:   `powershell -Command "Start-Service -Name '${RTMP_SERVICE_NAME}'"`,
+    stop:    `powershell -Command "Stop-Service  -Name '${RTMP_SERVICE_NAME}' -Force"`,
+    restart: `powershell -Command "Restart-Service -Name '${RTMP_SERVICE_NAME}' -Force"`
+  };
+  if (!commands[action]) throw new Error(`Acción no válida: ${action}`);
+  try {
+    const { stdout } = await execPromise(commands[action]);
+    return { success: true, message: stdout.trim() || `Comando '${action}' ejecutado` };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
+async function queryServiceStatus() {
+  try {
+    const { stdout } = await execPromise(
+      `powershell -Command "(Get-Service -Name '${RTMP_SERVICE_NAME}' -ErrorAction SilentlyContinue).Status"`
+    );
+    return stdout.trim(); // 'Running', 'Stopped', etc.
+  } catch {
+    return 'Unknown';
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -124,7 +155,7 @@ wss.on('connection', (ws) => {
   clients.add(ws);
   console.log(`✅ Cliente WebSocket conectado. Total: ${clients.size}`);
 
-  // Enviar estado inicial
+  // Enviar estado inicial con métricas actuales
   sendToClient(ws, {
     type: 'initial_state',
     data: {
@@ -142,16 +173,15 @@ wss.on('connection', (ws) => {
     console.error('Error en WebSocket:', error.message);
     clients.delete(ws);
   });
-
-  // Si es el primer cliente, iniciar watchers
-  if (clients.size === 1) {
-    startWatchers();
-  }
 });
 
 wss.on('close', () => {
   stopWatchers();
 });
+
+// Iniciar watchers inmediatamente al arrancar
+startWatchers();
+console.log('⏱️  Watchers iniciados al arranque');
 
 function startWatchers() {
   if (!logWatcher) {
@@ -232,6 +262,60 @@ const httpServer = http.createServer((req, res) => {
         res.end(JSON.stringify({ error: err.message }));
       }
     });
+  } else if (req.url === '/api/start' && req.method === 'POST') {
+    console.log('▶️  Solicitud de inicio del RTMP Server');
+    addActivity({ type: 'info', icon: 'play', message: 'Iniciando RTMP Server...' });
+    const result = await executeServiceCommand('start');
+    if (result.success) {
+      addActivity({ type: 'success', icon: 'check-circle', message: 'RTMP Server iniciado' });
+      broadcast({ type: 'server_control', data: { action: 'start', success: true } });
+    } else {
+      addActivity({ type: 'error', icon: 'alert-circle', message: `Error al iniciar: ${result.message}` });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+
+  } else if (req.url === '/api/restart' && req.method === 'POST') {
+    console.log('🔄 Solicitud de reinicio del RTMP Server');
+    dashboardState.status = 'starting';
+    broadcast({ type: 'state_update', data: dashboardState });
+    addActivity({ type: 'warning', icon: 'rotate-cw', message: 'Reiniciando RTMP Server...' });
+    const result = await executeServiceCommand('restart');
+    if (result.success) {
+      addActivity({ type: 'success', icon: 'check-circle', message: 'RTMP Server reiniciado' });
+      broadcast({ type: 'server_control', data: { action: 'restart', success: true } });
+    } else {
+      addActivity({ type: 'error', icon: 'alert-circle', message: `Error al reiniciar: ${result.message}` });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+
+  } else if (req.url === '/api/stop' && req.method === 'POST') {
+    console.log('🛑 Solicitud de detención del RTMP Server');
+    addActivity({ type: 'error', icon: 'square', message: 'Deteniendo RTMP Server...' });
+    const result = await executeServiceCommand('stop');
+    if (result.success) {
+      dashboardState.status = 'waiting_camera';
+      dashboardState.cameraConnected = false;
+      dashboardState.obsConnected = false;
+      dashboardState.cameraIP = null;
+      dashboardState.obsIP = null;
+      dashboardState.lastEvent = 'Servidor RTMP detenido manualmente';
+      dashboardState.lastEventTime = new Date();
+      addActivity({ type: 'warning', icon: 'square', message: 'RTMP Server detenido' });
+      broadcast({ type: 'state_update', data: dashboardState });
+      broadcast({ type: 'server_control', data: { action: 'stop', success: true } });
+    } else {
+      addActivity({ type: 'error', icon: 'alert-circle', message: `Error al detener: ${result.message}` });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+
+  } else if (req.url === '/api/service-status' && req.method === 'GET') {
+    const status = await queryServiceStatus();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status }));
+
   } else {
     res.writeHead(404);
     res.end('No encontrado');
@@ -239,13 +323,11 @@ const httpServer = http.createServer((req, res) => {
 });
 
 function updateDashboardState(update) {
-  const oldState = { ...dashboardState };
+  // Preservar startTime del dashboard, no sobreescribir con el del RTMP server
+  const preservedStartTime = dashboardState.startTime;
   Object.assign(dashboardState, update);
+  dashboardState.startTime = preservedStartTime;
 
-  // Si cambió el startTime, actualizar
-  if (update.startTime) {
-    dashboardState.startTime = new Date(update.startTime);
-  }
   if (update.lastEventTime) {
     dashboardState.lastEventTime = new Date(update.lastEventTime);
   }
