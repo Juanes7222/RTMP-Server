@@ -72,7 +72,7 @@ let lastLogPosition = 0;
 let logWatcher = null;
 let metricsInterval = null;
 
-console.log(`🔌 WebSocket Server iniciado en puerto ${WS_PORT}`);
+console.log(`WebSocket Server iniciado en puerto ${WS_PORT}`);
 
 // Funciones de utilidad
 function sendToClient(client, message) {
@@ -153,7 +153,7 @@ function updateMetrics() {
 // WebSocket Connections
 wss.on('connection', (ws) => {
   clients.add(ws);
-  console.log(`✅ Cliente WebSocket conectado. Total: ${clients.size}`);
+  console.log(` Cliente WebSocket conectado. Total: ${clients.size}`);
 
   // Enviar estado inicial con métricas actuales
   sendToClient(ws, {
@@ -166,7 +166,7 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     clients.delete(ws);
-    console.log(`❌ Cliente WebSocket desconectado. Total: ${clients.size}`);
+    console.log(` Cliente WebSocket desconectado. Total: ${clients.size}`);
   });
 
   ws.on('error', (error) => {
@@ -180,7 +180,7 @@ wss.on('close', () => {
 });
 
 wss.on('error', (err) => {
-  console.error('❌ Error en WebSocket Server:', err.message);
+  console.error(' Error en WebSocket Server:', err.message);
   if (err.code === 'EADDRINUSE') {
     console.error(`   Puerto ${WS_PORT} ya está en uso. Verificar que no hay otra instancia corriendo.`);
   }
@@ -188,33 +188,33 @@ wss.on('error', (err) => {
 
 // Manejadores globales para evitar crashes silenciosos
 process.on('uncaughtException', (err) => {
-  console.error('💥 Excepción no capturada:', err.message);
+  console.error(' Excepción no capturada:', err.message);
   console.error(err.stack);
   // No salir - mantener el servicio vivo
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 Promise rechazada sin manejar:', reason);
+  console.error(' Promise rechazada sin manejar:', reason);
   // No salir - mantener el servicio vivo
 });
 
 // Iniciar watchers inmediatamente al arrancar
 startWatchers();
-console.log('⏱️  Watchers iniciados al arranque');
+console.log('  Watchers iniciados al arranque');
 
 function startWatchers() {
   if (!logWatcher) {
     logWatcher = setInterval(() => {
       checkNewLogs();
     }, 1000);
-    console.log('📝 Log watcher iniciado');
+    console.log(' Log watcher iniciado');
   }
 
   if (!metricsInterval) {
     metricsInterval = setInterval(() => {
       updateMetrics();
     }, 3000);
-    console.log('📊 Metrics watcher iniciado');
+    console.log(' Metrics watcher iniciado');
   }
 }
 
@@ -222,13 +222,13 @@ function stopWatchers() {
   if (logWatcher) {
     clearInterval(logWatcher);
     logWatcher = null;
-    console.log('📝 Log watcher detenido');
+    console.log(' Log watcher detenido');
   }
 
   if (metricsInterval) {
     clearInterval(metricsInterval);
     metricsInterval = null;
-    console.log('📊 Metrics watcher detenido');
+    console.log(' Metrics watcher detenido');
   }
 }
 
@@ -282,7 +282,7 @@ const httpServer = http.createServer(async (req, res) => {
       }
     });
   } else if (req.url === '/api/start' && req.method === 'POST') {
-    console.log('▶️  Solicitud de inicio del RTMP Server');
+    console.log('  Solicitud de inicio del RTMP Server');
     addActivity({ type: 'info', icon: 'play', message: 'Iniciando RTMP Server...' });
     const result = await executeServiceCommand('start');
     if (result.success) {
@@ -295,7 +295,7 @@ const httpServer = http.createServer(async (req, res) => {
     res.end(JSON.stringify(result));
 
   } else if (req.url === '/api/restart' && req.method === 'POST') {
-    console.log('🔄 Solicitud de reinicio del RTMP Server');
+    console.log(' Solicitud de reinicio del RTMP Server');
     dashboardState.status = 'starting';
     broadcast({ type: 'state_update', data: dashboardState });
     addActivity({ type: 'warning', icon: 'rotate-cw', message: 'Reiniciando RTMP Server...' });
@@ -310,7 +310,7 @@ const httpServer = http.createServer(async (req, res) => {
     res.end(JSON.stringify(result));
 
   } else if (req.url === '/api/stop' && req.method === 'POST') {
-    console.log('🛑 Solicitud de detención del RTMP Server');
+    console.log(' Solicitud de detención del RTMP Server');
     addActivity({ type: 'error', icon: 'square', message: 'Deteniendo RTMP Server...' });
     const result = await executeServiceCommand('stop');
     if (result.success) {
@@ -379,7 +379,7 @@ function addActivity(activity) {
 }
 
 httpServer.on('error', (err) => {
-  console.error('❌ Error en HTTP Server:', err.message);
+  console.error(' Error en HTTP Server:', err.message);
   if (err.code === 'EADDRINUSE') {
     console.error(`   Puerto ${HTTP_PORT} ya está en uso. Verificar que no hay otra instancia corriendo.`);
     process.exit(1);
@@ -388,14 +388,14 @@ httpServer.on('error', (err) => {
 
 // Iniciar servidor HTTP
 httpServer.listen(HTTP_PORT, () => {
-  console.log(`🚀 Dashboard HTTP corriendo en http://localhost:${HTTP_PORT}`);
-  console.log(`📊 WebSocket corriendo en ws://localhost:${WS_PORT}`);
-  console.log(`✅ Dashboard listo - funciona independientemente del servidor RTMP`);
+  console.log(` Dashboard HTTP corriendo en http://localhost:${HTTP_PORT}`);
+  console.log(` WebSocket corriendo en ws://localhost:${WS_PORT}`);
+  console.log(` Dashboard listo - funciona independientemente del servidor RTMP`);
 });
 
 // Manejo de cierre
 process.on('SIGINT', () => {
-  console.log('\n🛑 Cerrando Dashboard Server...');
+  console.log('\n Cerrando Dashboard Server...');
   stopWatchers();
   wss.close();
   httpServer.close();
@@ -403,7 +403,7 @@ process.on('SIGINT', () => {
 });
 
 process.on('SIGTERM', () => {
-  console.log('\n🛑 Cerrando Dashboard Server...');
+  console.log('\n Cerrando Dashboard Server...');
   stopWatchers();
   wss.close();
   httpServer.close();
