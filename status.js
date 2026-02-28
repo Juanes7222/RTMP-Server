@@ -1234,7 +1234,7 @@ function renderStatusPage(serverState = {}) {
 
   <script>
     // WebSocket Connection
-    const WS_URL = 'ws://${ip}:8001';
+    const WS_URL = 'ws://${ip}:8002';
     let ws = null;
     let reconnectTimeout = null;
     let chart = null;
@@ -1245,6 +1245,7 @@ function renderStatusPage(serverState = {}) {
     };
     let currentLogFilter = 'all';
     let currentSearchTerm = '';
+    let currentState = null;
 
     // Initialize
     document.addEventListener('DOMContentLoaded', function() {
@@ -1292,6 +1293,12 @@ function renderStatusPage(serverState = {}) {
         case 'initial_state':
           updateServerState(message.data.state);
           updateLogs(message.data.logs.join('\\n'));
+          // Renderizar actividades iniciales
+          if (message.data.state.activities && message.data.state.activities.length > 0) {
+            const container = document.getElementById('activityContainer');
+            container.innerHTML = '';
+            message.data.state.activities.forEach(act => addActivity(act));
+          }
           break;
           
         case 'state_update':
@@ -1309,6 +1316,21 @@ function renderStatusPage(serverState = {}) {
         case 'new_activity':
           addActivity(message.data);
           break;
+
+        case 'server_control': {
+          const { action, success } = message.data;
+          if (!success) break;
+          if (action === 'stop') {
+            showNotification('Servidor RTMP detenido', 'error', 4000);
+          } else if (action === 'restart') {
+            showNotification('Servidor RTMP reiniciado exitosamente', 'success', 4000);
+          } else if (action === 'start') {
+            showNotification('Servidor RTMP iniciado', 'success', 4000);
+          }
+          // Re-enable buttons after action completes
+          document.querySelectorAll('.btn').forEach(btn => btn.disabled = false);
+          break;
+        }
       }
     }
 
@@ -1325,24 +1347,32 @@ function renderStatusPage(serverState = {}) {
 
     // Update Functions
     function updateServerState(state) {
+      // Guardar estado actual para que updateMetrics pueda usarlo
+      currentState = state;
+
       // Update status
       const statusInfo = getStatusInfo(state.status);
       document.getElementById('statusMainText').textContent = statusInfo.text;
       document.getElementById('statusDesc').textContent = statusInfo.desc;
-      document.getElementById('statusText').textContent = statusInfo.text;
+      const statusTextEl = document.getElementById('statusText');
+      if (statusTextEl) statusTextEl.textContent = statusInfo.text;
       
       // Update icon
       const iconWrapper = document.getElementById('statusIconWrapper');
-      iconWrapper.style.border = \`3px solid \${statusInfo.color}\`;
-      iconWrapper.style.background = statusInfo.bgColor;
+      if (iconWrapper) {
+        iconWrapper.style.border = \`3px solid \${statusInfo.color}\`;
+        iconWrapper.style.background = statusInfo.bgColor;
+      }
       
       const icon = document.getElementById('statusIcon');
-      icon.setAttribute('data-lucide', statusInfo.icon);
-      icon.style.color = statusInfo.color;
+      if (icon) {
+        icon.setAttribute('data-lucide', statusInfo.icon);
+        icon.style.color = statusInfo.color;
+      }
       
-      // Update uptime
-      if (state.metrics && state.metrics.uptime) {
-        document.getElementById('uptimeDisplay').textContent = formatUptime(state.metrics.uptime);
+      // Update uptime (siempre, aunque sea 0)
+      if (state.metrics !== undefined) {
+        document.getElementById('uptimeDisplay').textContent = formatUptime(state.metrics.uptime || 0);
       }
       
       // Calculate and update health score
@@ -1352,13 +1382,22 @@ function renderStatusPage(serverState = {}) {
     }
 
     function updateMetrics(metrics) {
+      // Actualizar uptime
+      document.getElementById('uptimeDisplay').textContent = formatUptime(metrics.uptime || 0);
+
       // Update top bar
       document.getElementById('bitrateDisplay').textContent = metrics.bitrate + ' Mbps';
       document.getElementById('cpuDisplay').textContent = metrics.cpu + '%';
       
+      // Fusionar métricas en currentState y recalcular health score
+      if (currentState) {
+        currentState.metrics = metrics;
+        updateHealthScore(currentState);
+      }
+
       // Update chart
       const now = new Date();
-      const timeLabel = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
+      const timeLabel = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
       
       chartData.labels.push(timeLabel);
       chartData.bitrate.push(parseFloat(metrics.bitrate));
@@ -1846,38 +1885,52 @@ function renderStatusPage(serverState = {}) {
       const buttons = document.querySelectorAll('.btn');
       buttons.forEach(btn => btn.disabled = true);
 
-      const messages = {
-        start: 'Iniciando servidor...',
-        restart: 'Reiniciando servidor...',
-        stop: 'Deteniendo servidor...'
+      const uiMessages = {
+        start:   'Iniciando servidor RTMP...',
+        restart: 'Reiniciando servidor RTMP, espere...',
+        stop:    'Deteniendo servidor RTMP...'
       };
 
-      showNotification(messages[action], 'info');
+      showNotification(uiMessages[action] || action, 'info', 6000);
 
       try {
         const response = await fetch('/api/' + action, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          headers: { 'Content-Type': 'application/json' }
         });
 
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error('HTTP ' + response.status + ': ' + text);
+        }
+
         const result = await response.json();
-        
+
         if (result.success) {
-          showNotification(result.message, 'success');
-          if (action !== 'stop') {
-            setTimeout(function() { location.reload(); }, 2000);
+          if (action === 'stop') {
+            // El dashboard manda state_update + server_control via WS; no hace falta reload.
+            // La notificación final llega por el mensaje server_control.
+            showNotification('Comando de detención enviado', 'info', 3000);
+          } else if (action === 'restart') {
+            // Esperar a que llegue el server_control via WS; los botones se liberan allí.
+            showNotification('Reinicio en curso, la UI se actualizará automáticamente...', 'info', 8000);
+            return; // No re-enable buttons here; server_control message will do it
+          } else if (action === 'start') {
+            showNotification('Servidor RTMP iniciado', 'success', 4000);
           }
         } else {
-          showNotification('Error: ' + result.message, 'error', 5000);
+          showNotification('Error: ' + result.message, 'error', 6000);
         }
       } catch (error) {
-        showNotification('Error de conexión: ' + error.message, 'error', 5000);
+        showNotification('Error al enviar comando: ' + error.message, 'error', 6000);
       } finally {
-        setTimeout(() => {
-          buttons.forEach(btn => btn.disabled = false);
-        }, 2000);
+        // For stop/start re-enable after short delay (restart is handled via WS)
+        if (action !== 'restart') {
+          setTimeout(() => buttons.forEach(btn => btn.disabled = false), 2000);
+        } else {
+          // Safety fallback: re-enable after 15 s if no server_control WS message arrives
+          setTimeout(() => buttons.forEach(btn => btn.disabled = false), 15000);
+        }
       }
     }
 

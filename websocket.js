@@ -10,7 +10,7 @@ const __dirname = dirname(__filename);
 const LOG_FILE = path.join(__dirname, 'logs', 'app.log');
 
 class RTMPWebSocketServer {
-  constructor(port = 8001) {
+  constructor(port = 8003) {
     this.wss = new WebSocketServer({ port });
     this.clients = new Set();
     this.lastLogPosition = 0;

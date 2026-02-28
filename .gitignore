@@ -137,3 +137,24 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# ==========================================
+# RTMP Server Specific
+# ==========================================
+
+# WinSW executables
+*-service.exe
+WinSW*.exe
+
+# Media files (archivos de streaming generados en tiempo real)
+media/live/
+*.ts
+*.m3u8
+
+# Log files específicos del proyecto
+logs/*.old
+
+# Archivos temporales de Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/

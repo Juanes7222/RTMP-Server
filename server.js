@@ -3,12 +3,11 @@ import NodeMediaServer from 'node-media-server';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
-import { renderStatusPage } from './status.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { initWebSocketServer, updateServerState, addActivity } from './websocket.js';
+import http from 'http';
 
 const execPromise = promisify(exec);
 
@@ -43,9 +42,9 @@ const serverState = {
   errors: []
 };
 
-// Inicializar WebSocket Server
-const wsServer = initWebSocketServer(8002);
-info(' WebSocket Server iniciado en puerto 8002');
+// Configuración del Dashboard Server
+const DASHBOARD_HOST = 'localhost';
+const DASHBOARD_PORT = 8001;
 
 // Sistema de logging mejorado
 function writeLog(level, message) {
@@ -97,6 +96,61 @@ function success(msg) {
 
 const ip = getLocalIP();
 info(` Local IP: ${ip}`);
+
+// Funciones para comunicarse con el Dashboard Server
+function sendToDashboard(endpoint, data) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(data);
+    const options = {
+      hostname: DASHBOARD_HOST,
+      port: DASHBOARD_PORT,
+      path: endpoint,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: 2000 // 2 segundos timeout
+    };
+
+    const req = http.request(options, (res) => {
+      let responseData = '';
+      res.on('data', (chunk) => {
+        responseData += chunk;
+      });
+      res.on('end', () => {
+        resolve({ statusCode: res.statusCode, data: responseData });
+      });
+    });
+
+    req.on('error', (err) => {
+      // Dashboard no disponible, ignorar silenciosamente
+      reject(err);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Dashboard timeout'));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
+
+function updateServerState(state) {
+  sendToDashboard('/api/state', state)
+    .catch(() => {
+      // Dashboard no disponible, continuar normalmente
+    });
+}
+
+function addActivity(activity) {
+  sendToDashboard('/api/activity', activity)
+    .catch(() => {
+      // Dashboard no disponible, continuar normalmente
+    });
+}
 
 // Configuración del servidor RTMP
 const rtmpConfig = {
@@ -298,129 +352,6 @@ setInterval(() => {
   updateSystemMetrics();
 }, 3000);
 
-// Servidor HTTP para el dashboard y API
-import http from 'http';
-
-const httpServer = http.createServer(async (req, res) => {
-  // Habilitar CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-  
-  // Ruta principal - Dashboard
-  if (req.url === '/' || req.url === '/status') {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    res.end(renderStatusPage(serverState));
-  } 
-  
-  // API: Iniciar servidor
-  else if (req.url === '/api/start' && req.method === 'POST') {
-    info(' Solicitud de inicio del servidor recibida');
-    
-    // Si está corriendo como servicio de Windows, usar comando de servicio
-    if (process.env.RUNNING_AS_SERVICE === 'true') {
-      const result = await executeServiceCommand('start');
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
-    } else {
-      // Si no es servicio, el servidor ya debería estar corriendo
-      // porque node-media-server inicia automáticamente al ejecutar server.js
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ 
-        success: true, 
-        message: 'El servidor ya está corriendo (node-media-server no admite start/stop dinámico)'
-      }));
-    }
-  } 
-  
-  // API: Reiniciar servidor
-  else if (req.url === '/api/restart' && req.method === 'POST') {
-    info(' Solicitud de reinicio del servidor recibida');
-    
-    serverState.lastEvent = 'Reiniciando servidor...';
-    serverState.lastEventTime = new Date();
-    
-    addActivity({
-      type: 'warning',
-      icon: 'rotate-cw',
-      message: 'Servidor reiniciado manualmente'
-    });
-    
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    
-    // Si está corriendo como servicio de Windows, usar comando de servicio
-    if (process.env.RUNNING_AS_SERVICE === 'true') {
-      res.end(JSON.stringify({ success: true, message: 'Reiniciando servicio...' }));
-      
-      setTimeout(async () => {
-        await executeServiceCommand('restart');
-      }, 500);
-    } else {
-      // Si no es servicio, reiniciar el proceso Node
-      res.end(JSON.stringify({ success: true, message: 'Reiniciando servidor (proceso se cerrará)...' }));
-      
-      setTimeout(() => {
-        process.exit(0); // El servicio se reiniciará automáticamente
-      }, 1000);
-    }
-  } 
-  
-  // API: Detener servidor
-  else if (req.url === '/api/stop' && req.method === 'POST') {
-    info(' Solicitud de detención del servidor recibida');
-    
-    serverState.lastEvent = 'Deteniendo servidor...';
-    serverState.lastEventTime = new Date();
-    
-    addActivity({
-      type: 'error',
-      icon: 'square',
-      message: 'Servidor detenido manualmente'
-    });
-    
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    
-    // Si está corriendo como servicio de Windows, usar comando de servicio
-    if (process.env.RUNNING_AS_SERVICE === 'true') {
-      res.end(JSON.stringify({ success: true, message: 'Deteniendo servicio...' }));
-      
-      setTimeout(async () => {
-        await executeServiceCommand('stop');
-      }, 500);
-    } else {
-      // Si no es servicio, cerrar el proceso
-      res.end(JSON.stringify({ success: true, message: 'Deteniendo servidor...' }));
-      
-      setTimeout(() => {
-        process.exit(0);
-      }, 1000);
-    }
-  } 
-  
-  // API: Obtener estado actual (para debugging)
-  else if (req.url === '/api/state' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(serverState));
-  }
-  
-  // 404
-  else {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('404 - No encontrado');
-  }
-});
-
-httpServer.listen(8000, () => {
-  success(` Dashboard disponible en http://${ip}:8000`);
-  info(` Panel de control: http://localhost:8000`);
-});
-
 // Manejo de errores global
 process.on('uncaughtException', (err) => {
   error(` Error no capturado: ${err.message}\n${err.stack}`);
@@ -450,7 +381,7 @@ console.log(`
 ║                                                            ║
 ║               SERVIDOR RTMP - PANEL DE CONTROL            ║
 ║                                                            ║
-║  Dashboard:    http://${ip}:8000                     ║
+║  Dashboard:    http://${ip}:8001                     ║
 ║  WebSocket:    ws://${ip}:8002                       ║
 ║  RTMP:         rtmp://${ip}:1935/live/stream         ║
 ║                                                            ║
@@ -459,7 +390,7 @@ console.log(`
 
 info(" Iniciando servidor RTMP...");
 info(` URL de streaming: rtmp://${ip}:1935/live/stream`);
-info(` URL HTTP Dashboard: http://${ip}:8000`);
+info(` Dashboard disponible en: http://${ip}:8001`);
 info(` WebSocket Server: ws://${ip}:8002`);
 
 // Configurar eventos y iniciar el servidor RTMP
@@ -497,17 +428,7 @@ process.on('SIGINT', () => {
   });
   
   setTimeout(() => {
-    if (wsServer) {
-      info(' Cerrando WebSocket server...');
-      wsServer.close();
-    }
-    
-    if (httpServer) {
-      info(' Cerrando servidor HTTP...');
-      httpServer.close();
-    }
-    
-    success(' Servidor cerrado correctamente');
+    success(' Servidor RTMP cerrado correctamente');
     process.exit(0);
   }, 500);
 });
@@ -522,13 +443,6 @@ process.on('SIGTERM', () => {
   });
   
   setTimeout(() => {
-    if (wsServer) {
-      wsServer.close();
-    }
-    if (httpServer) {
-      httpServer.close();
-    }
-    
     process.exit(0);
   }, 500);
 });
