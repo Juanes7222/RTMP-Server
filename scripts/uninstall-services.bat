@@ -1,65 +1,56 @@
 @echo off
-echo ========================================
-echo   Desinstalador de Servicios RTMP
-echo ========================================
+cd /d "%~dp0.."
+echo.
+echo  ╔══════════════════════════════════════════════════════╗
+echo  ║          DESINSTALAR SERVICIOS RTMP                 ║
+echo  ╚══════════════════════════════════════════════════════╝
 echo.
 
-REM Verificar permisos de administrador
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ERROR: Este script requiere permisos de administrador
-    echo Por favor, ejecuta como administrador
-    pause
-    exit /b 1
+    echo  [ERROR] Requiere permisos de Administrador.
+    pause & exit /b 1
 )
 
-echo [1/4] Deteniendo servicio RTMP...
-net stop RTMP-Server 2>nul
-if %errorLevel% equ 0 (
-    echo      Servicio RTMP detenido
-) else (
-    echo      El servicio RTMP no estaba corriendo
-)
+echo  Esto detendra y desinstalara ambos servicios.
+echo  Presiona Ctrl+C para cancelar, o cualquier tecla para continuar...
+pause >nul
 echo.
 
-echo [2/4] Deteniendo servicio Dashboard...
-net stop RTMP-Dashboard 2>nul
-if %errorLevel% equ 0 (
-    echo      Servicio Dashboard detenido
-) else (
-    echo      El servicio Dashboard no estaba corriendo
-)
+REM Detener primero
+echo  [1/4] Deteniendo RTMP Server...
+net stop RTMP-Server >nul 2>&1
+echo       OK
+
+echo  [2/4] Deteniendo Dashboard...
+net stop RTMP-Dashboard >nul 2>&1
+echo       OK
 echo.
 
-echo [3/4] Desinstalando servicio RTMP...
-cd /d "%~dp0\.."
+REM Desinstalar
+echo  [3/4] Desinstalando servicio RTMP...
 if exist "rtmp-service.exe" (
     rtmp-service.exe uninstall
-    if %errorLevel% equ 0 (
-        echo      Servicio RTMP desinstalado
-    ) else (
-        echo      ERROR al desinstalar servicio RTMP
-    )
+) else if exist "config\rtmp-service.exe" (
+    copy "config\rtmp-service.exe" "rtmp-service.exe" >nul
+    rtmp-service.exe uninstall
 ) else (
-    echo      No se encuentra rtmp-service.exe
+    echo       [!] rtmp-service.exe no encontrado - intentando con sc.exe...
+    sc delete RTMP-Server >nul 2>&1
 )
 echo.
 
-echo [4/4] Desinstalando servicio Dashboard...
+echo  [4/4] Desinstalando servicio Dashboard...
 if exist "dashboard-service.exe" (
     dashboard-service.exe uninstall
-    if %errorLevel% equ 0 (
-        echo      Servicio Dashboard desinstalado
-    ) else (
-        echo      ERROR al desinstalar servicio Dashboard
-    )
+) else if exist "config\dashboard-service.exe" (
+    copy "config\dashboard-service.exe" "dashboard-service.exe" >nul
+    dashboard-service.exe uninstall
 ) else (
-    echo      No se encuentra dashboard-service.exe
+    echo       [!] dashboard-service.exe no encontrado - intentando con sc.exe...
+    sc delete RTMP-Dashboard >nul 2>&1
 )
 echo.
-
-echo ========================================
-echo   Desinstalacion completada
-echo ========================================
+echo  Servicios desinstalados correctamente.
 echo.
 pause

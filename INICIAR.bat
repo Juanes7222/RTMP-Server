@@ -1,57 +1,50 @@
 @echo off
 cls
 echo.
-echo ╔════════════════════════════════════════════════════════════════════════╗
-echo ║              INICIO RAPIDO - Sistema RTMP + Dashboard                 ║
-echo ╚════════════════════════════════════════════════════════════════════════╝
-echo.
-echo Este script iniciara ambos servidores en modo desarrollo.
-echo.
-echo ¿Que hace este script?
-echo   1. Inicia el Dashboard Server (puerto 8001/8002)
-echo   2. Inicia el RTMP Server (puerto 1935)
-echo   3. Abre el Dashboard en tu navegador
-echo.
-echo Presiona cualquier tecla para continuar o Ctrl+C para cancelar...
-pause >nul
+echo  ╔══════════════════════════════════════════════════════╗
+echo  ║          INICIO RAPIDO - RTMP + Dashboard            ║
+echo  ╚══════════════════════════════════════════════════════╝
 echo.
 
 REM Verificar Node.js
 where node >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ERROR: Node.js no esta instalado
-    echo Descarga Node.js desde: https://nodejs.org/
-    echo.
-    pause
-    exit /b 1
+    echo  [ERROR] Node.js no esta instalado.
+    echo  Descarga desde: https://nodejs.org/
+    pause & exit /b 1
 )
 
-echo [✓] Node.js detectado
-echo.
-
-REM Verificar puertos
-echo Verificando puertos...
-netstat -ano | findstr ":8001" | findstr "LISTENING" >nul 2>&1
-if %errorLevel% equ 0 (
-    echo [!] ADVERTENCIA: Puerto 8001 ya esta en uso
-    echo     Detén el proceso que lo está usando o ignora este mensaje si ya esta corriendo
-    echo.
+REM Verificar archivos principales
+if not exist "%~dp0dashboard-server.js" (
+    echo  [ERROR] No se encuentra dashboard-server.js
+    pause & exit /b 1
+)
+if not exist "%~dp0server.js" (
+    echo  [ERROR] No se encuentra server.js
+    pause & exit /b 1
 )
 
-echo.
-echo ════════════════════════════════════════════════════════════════════════
-echo   Iniciando servidores...
-echo ════════════════════════════════════════════════════════════════════════
+echo  Iniciando servidores en modo desarrollo...
+echo  (Cierra cada ventana para detener el servidor correspondiente)
 echo.
 
-echo [1/3] Iniciando Dashboard Server...
-start "RTMP Dashboard" cmd /k "title RTMP Dashboard ^& cd /d %~dp0 ^& echo Dashboard HTTP: http://localhost:8001 ^& echo WebSocket: ws://localhost:8002 ^& echo. ^& echo Presiona Ctrl+C para detener ^& echo. ^& node dashboard-server.js"
+echo  [1/2] Iniciando Dashboard Server...
+start "RTMP Dashboard" cmd /k "title RTMP Dashboard & cd /d %~dp0 & node dashboard-server.js"
 
-echo [2/3] Esperando 3 segundos...
+echo  [2/2] Esperando 3 segundos e iniciando RTMP Server...
 timeout /t 3 /nobreak > nul
+start "RTMP Server" cmd /k "title RTMP Server & cd /d %~dp0 & node server.js"
 
-echo [3/3] Iniciando RTMP Server...
-start "RTMP Server" cmd /k "title RTMP Server ^& cd /d %~dp0 ^& echo RTMP Server: rtmp://localhost:1935/live/stream ^& echo. ^& echo Presiona Ctrl+C para detener ^& echo. ^& node server.js"
+echo.
+echo  ┌──────────────────────────────────────────────────────┐
+echo  │  Dashboard:  http://localhost:8001                   │
+echo  │  WebSocket:  ws://localhost:8002                     │
+echo  │  RTMP:       rtmp://localhost:1935/live/stream       │
+echo  └──────────────────────────────────────────────────────┘
+echo.
+timeout /t 3 /nobreak > nul
+start "" "http://localhost:8001"
+
 
 echo.
 echo ════════════════════════════════════════════════════════════════════════

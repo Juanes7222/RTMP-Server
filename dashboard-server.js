@@ -179,6 +179,25 @@ wss.on('close', () => {
   stopWatchers();
 });
 
+wss.on('error', (err) => {
+  console.error('❌ Error en WebSocket Server:', err.message);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`   Puerto ${WS_PORT} ya está en uso. Verificar que no hay otra instancia corriendo.`);
+  }
+});
+
+// Manejadores globales para evitar crashes silenciosos
+process.on('uncaughtException', (err) => {
+  console.error('💥 Excepción no capturada:', err.message);
+  console.error(err.stack);
+  // No salir - mantener el servicio vivo
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Promise rechazada sin manejar:', reason);
+  // No salir - mantener el servicio vivo
+});
+
 // Iniciar watchers inmediatamente al arrancar
 startWatchers();
 console.log('⏱️  Watchers iniciados al arranque');
@@ -214,7 +233,7 @@ function stopWatchers() {
 }
 
 // HTTP Server para el dashboard
-const httpServer = http.createServer((req, res) => {
+const httpServer = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -358,6 +377,14 @@ function addActivity(activity) {
 
   console.log(`📌 Nueva actividad: ${activity.message}`);
 }
+
+httpServer.on('error', (err) => {
+  console.error('❌ Error en HTTP Server:', err.message);
+  if (err.code === 'EADDRINUSE') {
+    console.error(`   Puerto ${HTTP_PORT} ya está en uso. Verificar que no hay otra instancia corriendo.`);
+    process.exit(1);
+  }
+});
 
 // Iniciar servidor HTTP
 httpServer.listen(HTTP_PORT, () => {

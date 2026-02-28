@@ -1,115 +1,59 @@
 @echo off
-echo ========================================
-echo   Instalador de Servicios RTMP
-echo ========================================
+cd /d "%~dp0.."
+echo.
+echo  ╔══════════════════════════════════════════════════════╗
+echo  ║           INSTALAR SERVICIOS RTMP                   ║
+echo  ╚══════════════════════════════════════════════════════╝
 echo.
 
-REM Verificar permisos de administrador
 net session >nul 2>&1
 if %errorLevel% neq 0 (
-    echo ERROR: Este script requiere permisos de administrador
-    echo Por favor, ejecuta como administrador
-    pause
-    exit /b 1
+    echo  [ERROR] Requiere permisos de Administrador.
+    pause & exit /b 1
 )
 
-echo Verificando archivos necesarios...
+REM Verificar que los EXE existen en config\
+if not exist "config\dashboard-service.exe" (
+    echo  [ERROR] No se encuentra config\dashboard-service.exe
+    echo  Descarga WinSW desde: https://github.com/winsw/winsw/releases
+    echo  Renombra el archivo a dashboard-service.exe y colócalo en config\
+    pause & exit /b 1
+)
+if not exist "config\rtmp-service.exe" (
+    echo  [ERROR] No se encuentra config\rtmp-service.exe
+    pause & exit /b 1
+)
+
+REM Copiar EXE y XML a la raiz (WinSW necesita ambos en el mismo directorio)
+echo  [1/4] Copiando archivos WinSW a C:\RTMP\...
+copy "config\dashboard-service.exe" "dashboard-service.exe" >nul
+copy "config\dashboard-service.xml" "dashboard-service.xml" >nul
+copy "config\rtmp-service.exe"      "rtmp-service.exe"      >nul
+copy "config\rtmp-service.xml"      "rtmp-service.xml"      >nul
+echo       OK
 echo.
 
-REM Verificar que existan los archivos XML
-if not exist "..\config\dashboard-service.xml" (
-    echo ERROR: No se encuentra config\dashboard-service.xml
-    pause
-    exit /b 1
-)
-
-if not exist "..\config\rtmp-service.xml" (
-    echo ERROR: No se encuentra config\rtmp-service.xml
-    pause
-    exit /b 1
-)
-
-REM Copiar archivos XML a la raíz si no existen
-if not exist "..\dashboard-service.xml" (
-    copy "..\config\dashboard-service.xml" "..\dashboard-service.xml" >nul
-    echo Copiado dashboard-service.xml desde config\
-)
-
-if not exist "..\rtmp-service.xml" (
-    copy "..\config\rtmp-service.xml" "..\rtmp-service.xml" >nul
-    echo Copiado rtmp-service.xml desde config\
-)
-
-REM Verificar que existan los ejecutables de WinSW
-if not exist "..\dashboard-service.exe" (
-    echo ADVERTENCIA: No se encuentra dashboard-service.exe
-    echo Descarga WinSW desde: https://github.com/winsw/winsw/releases
-    echo Renombra el archivo a: dashboard-service.exe
-    echo Coloca el archivo en: C:\RTMP\
-    echo.
-    pause
-    exit /b 1
-)
-
-if not exist "..\rtmp-service.exe" (
-    echo ADVERTENCIA: No se encuentra rtmp-service.exe
-    echo Descarga WinSW desde: https://github.com/winsw/winsw/releases
-    echo Renombra el archivo a: rtmp-service.exe
-    echo Coloca el archivo en: C:\RTMP\
-    echo.
-    pause
-    exit /b 1
-)
-
-echo [1/4] Instalando servicio Dashboard...
-cd /d "%~dp0\.."
+REM Instalar servicios
+echo  [2/4] Instalando servicio Dashboard...
 dashboard-service.exe install
-if %errorLevel% equ 0 (
-    echo      Servicio Dashboard instalado correctamente
-) else (
-    echo      ERROR al instalar el servicio Dashboard
-)
+if %errorLevel% equ 0 ( echo       OK ) else ( echo       [!] Puede que ya este instalado )
 echo.
 
-echo [2/4] Instalando servicio RTMP...
+echo  [3/4] Instalando servicio RTMP...
 rtmp-service.exe install
-if %errorLevel% equ 0 (
-    echo      Servicio RTMP instalado correctamente
-) else (
-    echo      ERROR al instalar el servicio RTMP
-)
+if %errorLevel% equ 0 ( echo       OK ) else ( echo       [!] Puede que ya este instalado )
 echo.
 
-echo [3/4] Iniciando servicio Dashboard...
-net start RTMP-Dashboard
-if %errorLevel% equ 0 (
-    echo      Dashboard iniciado correctamente
-) else (
-    echo      ERROR al iniciar Dashboard
-)
+REM Iniciar servicios
+echo  [4/4] Iniciando servicios...
+net start RTMP-Dashboard >nul 2>&1
+timeout /t 3 /nobreak >nul
+net start RTMP-Server >nul 2>&1
 echo.
-
-echo [4/4] Iniciando servicio RTMP...
-timeout /t 3 /nobreak > nul
-net start RTMP-Server
-if %errorLevel% equ 0 (
-    echo      RTMP Server iniciado correctamente
-) else (
-    echo      ERROR al iniciar RTMP Server
-)
+echo  Estado final:
+sc query RTMP-Dashboard | findstr "ESTADO\|STATE"
+sc query RTMP-Server | findstr "ESTADO\|STATE"
 echo.
-
-echo ========================================
-echo   Instalacion completada
-echo ========================================
-echo.
-echo Servicios instalados:
-echo   - RTMP-Dashboard (Puerto 8001)
-echo   - RTMP-Server (Puerto 1935)
-echo.
-echo Dashboard disponible en: http://localhost:8001
-echo.
-echo Para gestionar los servicios usa services.msc
-echo o los scripts: start-services.bat, stop-services.bat
+echo  Dashboard disponible en: http://localhost:8001
 echo.
 pause

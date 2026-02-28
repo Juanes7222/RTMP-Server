@@ -1901,7 +1901,7 @@ function renderStatusPage(serverState = {}) {
 
         if (!response.ok) {
           const text = await response.text();
-          throw new Error(`HTTP ${response.status}: ${text}`);
+          throw new Error('HTTP ' + response.status + ': ' + text);
         }
 
         const result = await response.json();

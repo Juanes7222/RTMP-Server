@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0.."
 setlocal enabledelayedexpansion
 
 cls
@@ -112,33 +113,33 @@ if defined IP (
 echo.
 
 REM ═══════════════════════════════════════════════════════════════════════════
-echo [PASO 6/6] Verificando configuración de servicios (opcional)...
+echo [PASO 6/6] Verificando servicios Windows...
 echo ─────────────────────────────────────────────────────────────────────────
 
-if exist "config\dashboard-service.xml" (
-    echo [✓] config\dashboard-service.xml
+sc query RTMP-Dashboard >nul 2>&1
+if %errorLevel% equ 0 (
+    for /f "tokens=*" %%s in ('sc query RTMP-Dashboard ^| findstr "STATE"') do (
+        echo [i] RTMP-Dashboard: %%s
+    )
+    if exist "dashboard-service.exe" (
+        echo [✓] dashboard-service.exe (WinSW)
+    ) else (
+        echo [!] dashboard-service.exe no encontrado - ejecuta scripts\install-services.bat
+        set /a WARNINGS+=1
+    )
 ) else (
-    echo [!] config\dashboard-service.xml no encontrado
+    echo [!] Servicio RTMP-Dashboard NO instalado - ejecuta scripts\install-services.bat
     set /a WARNINGS+=1
 )
 
-if exist "config\rtmp-service.xml" (
-    echo [✓] config\rtmp-service.xml
+sc query RTMP-Server >nul 2>&1
+if %errorLevel% equ 0 (
+    for /f "tokens=*" %%s in ('sc query RTMP-Server ^| findstr "STATE"') do (
+        echo [i] RTMP-Server: %%s
+    )
 ) else (
-    echo [!] config\rtmp-service.xml no encontrado
+    echo [!] Servicio RTMP-Server NO instalado - ejecuta scripts\install-services.bat
     set /a WARNINGS+=1
-)
-
-if exist "dashboard-service.exe" (
-    echo [✓] dashboard-service.exe (WinSW)
-) else (
-    echo [i] dashboard-service.exe no encontrado (solo necesario para servicios Windows)
-)
-
-if exist "rtmp-service.exe" (
-    echo [✓] rtmp-service.exe (WinSW)
-) else (
-    echo [i] rtmp-service.exe no encontrado (solo necesario para servicios Windows)
 )
 echo.
 
@@ -151,11 +152,11 @@ if %ERRORS% equ 0 (
     if %WARNINGS% equ 0 (
         echo [✓] Sistema listo para usar - No hay problemas
         echo.
-        echo Para iniciar el sistema ejecuta:
-        echo     INICIAR.bat
+        echo Para iniciar en modo desarrollo:  INICIAR.bat
+        echo Para iniciar como servicios:      scripts\start-services.bat
     ) else (
         echo [!] Sistema funcional con !WARNINGS! advertencia^(s^)
-        echo     El sistema puede funcionar pero hay advertencias
+        echo     El sistema puede funcionar pero revisa las advertencias
     )
 ) else (
     echo [✗] Se encontraron !ERRORS! error^(es^) que deben ser corregidos

@@ -1,46 +1,34 @@
 @echo off
-echo ========================================
-echo   Iniciando Servicios RTMP
-echo ========================================
+cd /d "%~dp0.."
 echo.
-
-REM Verificar permisos de administrador
 net session >nul 2>&1
-if %errorLevel% neq 0 (
-    echo ERROR: Este script requiere permisos de administrador
-    echo Por favor, ejecuta como administrador
-    pause
-    exit /b 1
+if %errorLevel% neq 0 ( echo  [ERROR] Requiere Administrador. & pause & exit /b 1 )
+
+REM Auto-reparar exe del Dashboard si fue eliminado
+if not exist "dashboard-service.exe" (
+    echo  [AUTO-REPAIR] Restaurando dashboard-service.exe desde config\...
+    copy "config\dashboard-service.exe" "dashboard-service.exe" >nul
+    copy "config\dashboard-service.xml" "dashboard-service.xml" >nul
+    echo               OK
+    echo.
 )
 
-echo [1/2] Iniciando Dashboard...
-net start RTMP-Dashboard
-if %errorLevel% equ 0 (
-    echo      Dashboard iniciado
-) else (
-    echo      ERROR: No se pudo iniciar Dashboard
+REM Limpiar procesos zombie en puertos 8001/8002
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr " :8001 "') do (
+    taskkill /PID %%P /F >nul 2>&1
 )
-echo.
-
-echo Esperando 3 segundos...
-timeout /t 3 /nobreak > nul
-echo.
-
-echo [2/2] Iniciando RTMP Server...
-net start RTMP-Server
-if %errorLevel% equ 0 (
-    echo      RTMP Server iniciado
-) else (
-    echo      ERROR: No se pudo iniciar RTMP Server
+for /f "tokens=5" %%P in ('netstat -ano ^| findstr " :8002 "') do (
+    taskkill /PID %%P /F >nul 2>&1
 )
-echo.
 
-echo ========================================
-echo   Servicios iniciados
-echo ========================================
-echo   Dashboard: http://localhost:8001
-echo   WebSocket: ws://localhost:8002
-echo   RTMP: rtmp://localhost:1935/live/stream
-echo ========================================
+echo  [1/2] Iniciando Dashboard...
+net start RTMP-Dashboard >nul 2>&1 && echo       OK || echo       [ERROR] Ejecuta fix-dashboard-service.bat
+echo.
+timeout /t 3 /nobreak >nul
+
+echo  [2/2] Iniciando RTMP Server...
+net start RTMP-Server >nul 2>&1 && echo       OK || echo       [ERROR] No se pudo iniciar
+echo.
+echo  Dashboard: http://localhost:8001
 echo.
 pause
