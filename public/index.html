@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="noche">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RTMP · control de señal</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-state="starting">
+  <div class="bars" aria-hidden="true">
+    <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+  </div>
+
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3Z"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 11l5 5 5-5M4 21h16"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.5 18a9 9 0 1 1 15 0"/><path d="m12 14 4-4"/><circle cx="12" cy="15" r="1.6"/></symbol>
+    <symbol id="i-memory" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="3"/><path d="M7 7v10M12 7v10M17 7v10"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10Z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">RTMP</span>
+      <span class="brand-name">control de señal</span>
+    </div>
+
+    <div class="status-pill">
+      <span class="led" id="serviceLed" aria-hidden="true"></span>
+      <span class="status-pill-label">Servicio</span>
+      <strong id="serviceText">Consultando</strong>
+    </div>
+
+    <div class="topbar-actions">
+      <span class="conn" id="connLink"><i aria-hidden="true"></i><span id="connText">Conectando</span></span>
+      <button class="icon-btn" id="paletteBtn" title="Comandos (Ctrl+K)" aria-label="Abrir comandos">
+        <svg class="icon" aria-hidden="true"><use href="#i-command"/></svg>
+      </button>
+      <button class="icon-btn" id="themeBtn" title="Cambiar entre día y noche" aria-label="Cambiar tema">
+        <svg class="icon" aria-hidden="true"><use id="themeIcon" href="#i-moon"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="monitor" id="monitor" data-state="starting" aria-live="polite">
+      <div class="monitor-stage">
+        <div class="stage-head">
+          <span class="tally" aria-hidden="true"></span>
+          <h1 class="status-word" id="statusWord">INICIANDO</h1>
+        </div>
+        <p class="status-desc" id="statusDesc">Conectando con el servidor.</p>
+
+        <div class="chain" id="chain">
+          <div class="chain-node" id="nodeCamera">
+            <span class="chain-dot" aria-hidden="true"></span>
+            <span class="chain-name">Cámara</span>
+            <span class="chain-addr" id="cameraAddr">sin conexión</span>
+          </div>
+          <div class="chain-link" id="linkA" aria-hidden="true"><span></span></div>
+          <div class="chain-node" id="nodeServer">
+            <span class="chain-dot" aria-hidden="true"></span>
+            <span class="chain-name">Servidor</span>
+            <span class="chain-addr" id="serverAddr">puerto 1935</span>
+          </div>
+          <div class="chain-link" id="linkB" aria-hidden="true"><span></span></div>
+          <div class="chain-node" id="nodeObs">
+            <span class="chain-dot" aria-hidden="true"></span>
+            <span class="chain-name">OBS</span>
+            <span class="chain-addr" id="obsAddr">sin conexión</span>
+          </div>
+        </div>
+
+        <p class="stage-event" id="lastEvent">Sin eventos todavía.</p>
+      </div>
+    </section>
+
+    <aside class="bay control-bay">
+      <header class="bay-head"><h2>Servidor</h2></header>
+
+      <dl class="rows">
+        <div class="row"><dt>Señal</dt><dd id="streamInfo">Sin datos</dd></div>
+        <div class="row"><dt>Reproductores</dt><dd id="players">0</dd></div>
+        <div class="row"><dt>Memoria del proceso</dt><dd id="processRss">—</dd></div>
+      </dl>
+
+      <div class="publish">
+        <span class="publish-label">Dirección de publicación</span>
+        <div class="publish-row">
+          <code id="urlBox">rtmp://—</code>
+          <button class="chip-btn" id="copyBtn" type="button">Copiar</button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn start" id="btnStart" type="button">Iniciar</button>
+        <button class="btn restart" id="btnRestart" type="button">Reiniciar</button>
+        <button class="btn stop" id="btnStop" type="button">Detener</button>
+      </div>
+    </aside>
+
+    <section class="readouts" aria-label="Lecturas del sistema">
+      <article class="readout" data-tone="violet">
+        <span class="readout-icon"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
+        <div class="readout-body">
+          <span class="readout-label">Tiempo en marcha</span>
+          <span class="readout-value" id="readUptime">--:--:--</span>
+        </div>
+      </article>
+
+      <article class="readout" data-tone="cyan">
+        <span class="readout-icon"><svg class="icon" aria-hidden="true"><use href="#i-gauge"/></svg></span>
+        <div class="readout-body">
+          <span class="readout-label">Velocidad</span>
+          <span class="readout-value"><span id="readBitrate">0,00</span><small>Mb/s</small></span>
+          <span class="meter"><i id="meterBitrate"></i></span>
+        </div>
+      </article>
+
+      <article class="readout" data-tone="amber">
+        <span class="readout-icon"><svg class="icon" aria-hidden="true"><use href="#i-cpu"/></svg></span>
+        <div class="readout-body">
+          <span class="readout-label">CPU</span>
+          <span class="readout-value"><span id="readCpu">0</span><small>%</small></span>
+          <span class="meter"><i id="meterCpu"></i></span>
+        </div>
+      </article>
+
+      <article class="readout" data-tone="emerald">
+        <span class="readout-icon"><svg class="icon" aria-hidden="true"><use href="#i-memory"/></svg></span>
+        <div class="readout-body">
+          <span class="readout-label">Memoria</span>
+          <span class="readout-value"><span id="readMemory">0</span><small>%</small></span>
+          <span class="meter"><i id="meterMemory"></i></span>
+        </div>
+      </article>
+    </section>
+
+    <section class="bay chart-bay">
+      <header class="bay-head">
+        <h2>Rendimiento</h2>
+        <div class="segment" id="chartMetric" role="tablist" aria-label="Métrica">
+          <button type="button" data-metric="bitrate" class="active" data-tone="cyan" role="tab" aria-selected="true">Bitrate</button>
+          <button type="button" data-metric="cpu" data-tone="amber" role="tab" aria-selected="false">CPU</button>
+          <button type="button" data-metric="memory" data-tone="emerald" role="tab" aria-selected="false">RAM</button>
+        </div>
+      </header>
+
+      <div class="chart-wrap">
+        <canvas id="chart" aria-label="Histórico de rendimiento"></canvas>
+        <span class="chart-empty" id="chartEmpty">Recibiendo datos…</span>
+      </div>
+
+      <footer class="bay-foot">
+        <div class="summary">
+          <span>Ahora <b id="sumNow">—</b></span>
+          <span>Media <b id="sumAvg">—</b></span>
+          <span>Máximo <b id="sumMax">—</b></span>
+        </div>
+        <div class="segment" id="chartRange" role="tablist" aria-label="Rango de tiempo">
+          <button type="button" data-range="60" class="active" role="tab" aria-selected="true">1 min</button>
+          <button type="button" data-range="300" role="tab" aria-selected="false">5 min</button>
+          <button type="button" data-range="900" role="tab" aria-selected="false">15 min</button>
+        </div>
+      </footer>
+    </section>
+
+    <section class="bay activity-bay">
+      <header class="bay-head">
+        <h2>Actividad</h2>
+      </header>
+      <ul class="feed" id="feed">
+        <li class="feed-empty">Aún no hay eventos. Cuando la cámara u OBS se conecten aparecerán aquí.</li>
+      </ul>
+    </section>
+
+    <section class="bay log-bay">
+      <header class="bay-head">
+        <h2>Registro</h2>
+        <div class="log-tools">
+          <div class="segment" id="logLevel" role="tablist" aria-label="Nivel de registro">
+            <button type="button" data-level="all" class="active" role="tab" aria-selected="true">Todo</button>
+            <button type="button" data-level="error" role="tab" aria-selected="false">Errores</button>
+            <button type="button" data-level="warn" role="tab" aria-selected="false">Avisos</button>
+            <button type="button" data-level="info" role="tab" aria-selected="false">Info</button>
+          </div>
+          <button class="icon-btn" id="logDownload" title="Descargar registro" aria-label="Descargar registro">
+            <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <label class="search">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+        <input id="logSearch" type="search" placeholder="Buscar en el registro" autocomplete="off">
+      </label>
+
+      <div class="console" id="logs" role="log"></div>
+
+      <footer class="bay-foot">
+        <span class="log-count" id="logCount">0 líneas</span>
+        <label class="check"><input type="checkbox" id="logFollow" checked> Seguir</label>
+      </footer>
+    </section>
+  </main>
+
+  <div class="palette-overlay" id="paletteOverlay" hidden></div>
+  <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Comandos" hidden>
+    <div class="palette-head">
+      <svg class="icon" aria-hidden="true"><use href="#i-command"/></svg>
+      <input id="paletteInput" class="palette-input" placeholder="Escribe un comando" autocomplete="off">
+      <button class="icon-btn" id="paletteClose" aria-label="Cerrar">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </div>
+    <ul class="palette-list" id="paletteList"></ul>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
