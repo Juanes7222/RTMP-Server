@@ -15,7 +15,6 @@ echo.
 echo  Puertos:
 echo  ─────────────────────────────────────────────────────
 netstat -ano | findstr " :8001 " | findstr LISTENING >nul 2>&1 && echo   8001 (Dashboard HTTP):  EN USO || echo   8001 (Dashboard HTTP):  LIBRE
-netstat -ano | findstr " :8002 " | findstr LISTENING >nul 2>&1 && echo   8002 (WebSocket):      EN USO || echo   8002 (WebSocket):      LIBRE
 netstat -ano | findstr " :1935 " | findstr LISTENING >nul 2>&1 && echo   1935 (RTMP):           EN USO || echo   1935 (RTMP):           LIBRE
 echo.
 pause

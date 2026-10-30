@@ -13,11 +13,8 @@ if not exist "dashboard-service.exe" (
     echo.
 )
 
-REM Limpiar procesos zombie en puertos 8001/8002
+REM Limpiar procesos zombie en el puerto 8001
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr " :8001 "') do (
-    taskkill /PID %%P /F >nul 2>&1
-)
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr " :8002 "') do (
     taskkill /PID %%P /F >nul 2>&1
 )
 

@@ -30,7 +30,7 @@ REM ═════════════════════════�
 echo [PASO 2/6] Verificando archivos del proyecto...
 echo ─────────────────────────────────────────────────────────────────────────
 
-set "FILES=dashboard-server.js server.js status.js utils.js package.json"
+set "FILES=dashboard-server.js server.js package.json public\index.html src\config.js"
 for %%f in (%FILES%) do (
     if exist "%%f" (
         echo [✓] %%f
@@ -52,24 +52,12 @@ if %errorLevel% equ 0 (
     for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8001" ^| findstr "LISTENING"') do (
         echo     PID: %%a
         set "PID=%%a"
-        goto :check8002
+        goto :check1935
     )
 ) else (
     echo [✓] Puerto 8001 (Dashboard HTTP): LIBRE
 )
 
-:check8002
-REM Puerto 8002
-netstat -ano | findstr ":8002" | findstr "LISTENING" >nul 2>&1
-if %errorLevel% equ 0 (
-    echo [i] Puerto 8002 (WebSocket): EN USO
-    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8002" ^| findstr "LISTENING"') do (
-        echo     PID: %%a
-        goto :check1935
-    )
-) else (
-    echo [✓] Puerto 8002 (WebSocket): LIBRE
-)
 
 :check1935
 REM Puerto 1935
@@ -170,7 +158,7 @@ if defined IP (
     echo ═════════════════════════════════════════════════════════════════════════
     echo.
     echo   Dashboard Web:    http://%IP%:8001
-    echo   WebSocket:        ws://%IP%:8002  
+    echo   WebSocket:        ws://%IP%:8001/ws  
     echo   RTMP Stream:      rtmp://%IP%:1935/live/stream
     echo.
     echo ═════════════════════════════════════════════════════════════════════════

@@ -38,7 +38,7 @@ start "RTMP Server" cmd /k "title RTMP Server & cd /d %~dp0 & node server.js"
 echo.
 echo  ┌──────────────────────────────────────────────────────┐
 echo  │  Dashboard:  http://localhost:8001                   │
-echo  │  WebSocket:  ws://localhost:8002                     │
+echo  │  WebSocket:  ws://localhost:8001/ws                  │
 echo  │  RTMP:       rtmp://localhost:1935/live/stream       │
 echo  └──────────────────────────────────────────────────────┘
 echo.
@@ -63,7 +63,7 @@ echo ╔════════════════════════
 echo ║                         SISTEMA EN EJECUCION                           ║
 echo ╠════════════════════════════════════════════════════════════════════════╣
 echo ║  Dashboard:      http://localhost:8001                                 ║
-echo ║  WebSocket:      ws://localhost:8002                                   ║
+echo ║  WebSocket:      ws://localhost:8001/ws                                ║
 echo ║  RTMP Stream:    rtmp://localhost:1935/live/stream                     ║
 echo ╠════════════════════════════════════════════════════════════════════════╣
 echo ║  Se abrieron DOS ventanas de terminal:                                 ║

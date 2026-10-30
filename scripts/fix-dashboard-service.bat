@@ -17,13 +17,9 @@ copy "%~dp0..\config\dashboard-service.xml" "%~dp0..\dashboard-service.xml" >nul
 echo      OK
 
 echo.
-echo [2/5] Limpiando procesos zombie en puertos 8001/8002...
+echo [2/5] Limpiando procesos zombie en el puerto 8001...
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr " :8001 "') do (
     echo      Matando PID %%P ^(puerto 8001^)
-    taskkill /PID %%P /F >nul 2>&1
-)
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr " :8002 "') do (
-    echo      Matando PID %%P ^(puerto 8002^)
     taskkill /PID %%P /F >nul 2>&1
 )
 echo      OK
